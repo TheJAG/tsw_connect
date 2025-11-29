@@ -1,0 +1,19 @@
+tsw_connect:
+  data:
+    player:
+      filename: c:\Projects\tsw3 route maps\_dev\player_data.gpkg
+      columns: [
+          "current_service_name",
+          "max_speed",
+          "next_speed_limit",
+          "next_speed_limit_distance",
+          "next_speed_limit_x",
+          "next_speed_limit_y",
+          "current_tile_x",
+          "current_tile_y",
+          "gradient",
+          "geometry"
+      ]
+    ai:
+      filename: c:\Projects\tsw3 route maps\_dev\ai_data.gpkg
+      columns: ["ctime", "vehicle_id", "vehicle_class", "geometry"]

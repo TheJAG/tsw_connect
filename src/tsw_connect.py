@@ -5,76 +5,96 @@ from typing import List
 
 import requests
 import threading
-from tkinter import messagebox
-import tkinter as tk
 
-import geopandas as gpd
-import pandas as pd
-
-from utils.tsw_httpapi import get_subscription, setup_subscription, get_player_data, get_timetable, get_ai_data
-
-all_vehicles = get_timetable()
-setup_subscription(all_vehicles)
-player_data = []
-ai_data = []
-
-# Flag to control the loop
-keep_running = threading.Event()
-keep_running.set()  # Start as True
+from src.config.config import Config
+from src.utils.gpkg_writer_utils import write_to_gpkg
+from src.utils.tsw_data import get_player_data, get_ai_data
+from utils.tsw_httpapi import get_subscription, setup_subscription, get_timetable
+from src.utils.dashboard_gui import DashboardGUI
 
 
-def show_cancel_dialog():
-    root = tk.Tk()
-    root.withdraw()  # Hide the main window
-    result = messagebox.askokcancel("Running", "Click Cancel to stop the loop")
-    if not result:
-        keep_running.clear()  # Stop the loop
-    root.destroy()
+class TSWConnect:
+    def __init__(self, config: Config, all_vehicles: List[str]) -> None:
+        self.config = config
+        self.all_vehicles = all_vehicles
+        self.keep_running = threading.Event()
+        self.data = {"player": [], "ai": []}
+
+    @staticmethod
+    def setup() -> "TSWConnect":
+        config = Config.load()
+        all_vehicles = get_timetable()
+        setup_subscription(all_vehicles)
+        return TSWConnect(config, all_vehicles)
+
+    def _collection_loop(self, collection_interval_sec: float):
+        """
+        Background thread function to collect data.
+        """
+        print("Starting data collection loop...")
+        while self.keep_running.is_set():
+            try:
+                content = get_subscription()
+                # print(content)  # Optional: reduce console spam
+                ctime = datetime.now()
+                
+                # Safely append data
+                p_data = get_player_data(content)
+                a_data = get_ai_data(ctime, self.all_vehicles, content)
+                
+                self.data["player"].append(p_data)
+                self.data["ai"].extend(a_data)
+                
+                time.sleep(collection_interval_sec)
+            except requests.exceptions.ConnectionError as e:
+                # print(f"Connection Error: {e}")
+                pass
+            except requests.exceptions.HTTPError as e:
+                # print(f"HTTP Error: {e}")
+                pass
+
+        print("Collection loop finished.")
+
+    def run(self, collection_interval_sec: float = 0.5) -> None:
+        """
+        Runs the data collection process in a separate thread and initializes the GUI for
+        progress updates. This function handles setting up necessary threads, running the
+        GUI, and saving collected data into files after the process is complete.
+
+        :param collection_interval_sec: Interval (in seconds) at which data is collected
+                                        in the background thread. By default, this is set
+                                        to 0.5 seconds.
+        :return: This function does not return a value.
+        """
+        self.keep_running.set()
+        self.data = {"player": [], "ai": []}
+        start_time = datetime.now()
+
+        # Start collection in background thread
+        collection_thread = threading.Thread(
+            target=self._collection_loop, 
+            args=(collection_interval_sec,), 
+            daemon=True
+        )
+        collection_thread.start()
+
+        # GUI Setup (Main Thread)
+        def stop_callback():
+            self.keep_running.clear()
+
+        gui = DashboardGUI(self.data, stop_callback, start_time)
+        gui.run()
+
+        print("Waiting for collection thread to join...")
+        collection_thread.join(timeout=2.0)
+
+        print("Saving data...")
+        write_to_gpkg(self.config.data.get("player"), self.data.get("player"))
+        write_to_gpkg(self.config.data.get("ai"), self.data.get("ai"))
+
+        print("DONE!")
 
 
-def write_to_gpkg(data: List[any], cols: List[str], file_name: str) -> None:
-    df = pd.DataFrame(data, columns=cols)
-    gdf = gpd.GeoDataFrame(data=df, geometry=df.geometry, crs="EPSG:4326")
-    gdf.to_file(file_name, driver="GPKG")
-
-
-# Start the messagebox in a background thread
-dialog_thread = threading.Thread(target=show_cancel_dialog, daemon=True)
-dialog_thread.start()
-
-while keep_running.is_set():
-    try:
-        content = get_subscription()
-        ctime = datetime.now()
-        player_data.append(get_player_data(content))
-        ai_data.extend(get_ai_data(ctime, all_vehicles, content))
-        print(content)
-        time.sleep(0.1)
-    except requests.exceptions.ConnectionError as e:
-        print(f"Error: {e}")
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP Error: {e}")
-
-print("Loop stopped by user")
-
-player_filename = r"c:\Projects\tsw3 route maps\_dev\player_data.gpkg"
-ai_filename = r"c:\Projects\tsw3 route maps\_dev\ai_data.gpkg"
-
-player_cols = [
-    "current_service_name",
-    "max_speed",
-    "next_speed_limit",
-    "next_speed_limit_distance",
-    "next_speed_limit_x",
-    "next_speed_limit_y",
-    "current_tile_x",
-    "current_tile_y",
-    "gradient",
-    "geometry"
-]
-ai_cols = ["ctime", "vehicle_id", "vehicle_class", "geometry"]
-
-write_to_gpkg(player_data, player_cols, player_filename)
-write_to_gpkg(ai_data, ai_cols, ai_filename)
-
-print("DONE!")
+if __name__ == "__main__":
+    tswc = TSWConnect.setup()
+    tswc.run()

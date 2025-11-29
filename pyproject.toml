@@ -16,7 +16,8 @@ dependencies = [
     "geopandas",
     "numpy",
     "pandas",
-    "requests"
+    "requests",
+    "pyyaml"
 ]
 
 [project.optional-dependencies]

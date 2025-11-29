@@ -103,7 +103,17 @@ def get_vehicle_info(vehicle_id: str) -> str:
     return content["Values"]["ObjectClass"]
 
 
-def setup_subscription(all_vehicles: List[str]):
+def subscription_urls(all_vehicles: List[str]) -> List[str]:
+    """
+    Generates a list of subscription URLs for the provided vehicle identifiers. The generated URLs
+    include predefined static URLs and dynamically constructed URLs for each vehicle in the input
+    list. Static URLs are related to "DriverAid" subscriptions, while dynamic URLs pertain to
+    timetable subscriptions for specific vehicles.
+
+    :param all_vehicles: A list of vehicle identifiers used to construct specific subscription URLs
+    :return: A list of subscription URLs derived from static configurations and the provided vehicle identifiers
+    :rtype: List[str]
+    """
     object_class_urls = [
         f"http://127.0.0.1:31270/subscription/Timetable/{vehicle_id}.ObjectClass?Subscription={SUBSCRIPTION_ID}"
         for vehicle_id in all_vehicles
@@ -112,12 +122,25 @@ def setup_subscription(all_vehicles: List[str]):
         f"http://127.0.0.1:31270/subscription/Timetable/{vehicle_id}.LatLon?Subscription={SUBSCRIPTION_ID}"
         for vehicle_id in all_vehicles
     ]
-    urls = [
+    return [
         f"http://127.0.0.1:31270/subscription/DriverAid.PlayerInfo?Subscription={SUBSCRIPTION_ID}",
         f"http://127.0.0.1:31270/subscription/DriverAid.Data?Subscription={SUBSCRIPTION_ID}"
     ] + object_class_urls + lat_long_urls
 
+
+def setup_subscription(all_vehicles: List[str]):
+    """
+    Sets up subscriptions for a list of vehicles by sending post requests to the
+    generated URLs. Retries connection errors and logs progress, ensuring all
+    requests are completed before concluding.
+
+    :param all_vehicles: List of vehicle identifiers for which subscriptions
+                         are being setup.
+    :type all_vehicles: List[str]
+    :return: None
+    """
     print("Setting up subscription ", end="")
+    urls = subscription_urls(all_vehicles)
 
     idx = 0
     while idx < len(urls):
