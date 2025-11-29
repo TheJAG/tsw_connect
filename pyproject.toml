@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tsw-connect"
+version = "0.1.0"
+description = "Connect to TSW using -HTTPAPI and extract player, track and other vehicle data"
+readme = "README.md"
+requires-python = ">=3.14"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Michiel Jagersma", email = "m_jagersma@hotmail.com" }
+]
+dependencies = [
+    "geopandas",
+    "numpy",
+    "pandas",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "sphinx",
+    "sphinx-rtd-theme",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 120
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.sphinx]
+source-dir = "docs"
+build-dir = "docs/_build"
+config-dir = "docs"
