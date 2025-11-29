@@ -142,9 +142,10 @@ To get a local copy up and running follow these simple example steps.
    ```sh
    .venv\scripts\activate.bat
    ```
-4. Install the requirements
+4. Install the requirements using the pip build backend (pyproject.toml)
    ```sh
-   pip install -r requirements.txt
+   pip install .
+   pip install .[dev]  # for developers
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
